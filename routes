@@ -1,0 +1,78 @@
+const express = require('express');
+const bcrypt = require('bcryptjs');
+const passport = require('passport');
+const { body,validationResult } = require('express-validator/check');
+const { sanitizeBody } = require('express-validator/filter');
+const mysql = require('mysql');
+
+const router = express.Router();
+
+const connection = require('../mysql/database');
+
+router.get('/login', (req, res) => {
+    res.render('login.ejs', { error: req.flash('error') });
+});
+/*
+router.get('/lfg', (req, res) => {
+    res.render('lfg.ejs', { errors: [] });
+});
+
+router.get('/ticket', (req, res) => {
+    res.render('ticket.ejs', { errors: [] });
+});
+*/
+router.get('/register', (req, res) => {
+    res.render('register.ejs', { errors: [] });
+});
+
+router.post('/register', [
+        body('username').isLength({ min: 4 }).trim().escape(),
+        body('password').isLength({min:6}).trim().escape(),
+        body('email').isEmail().normalizeEmail(),],
+  (req, res) => {
+    const { name, username, password, password2, email } = req.body;
+    let errors = [];
+
+    if(!name || !username || !email || !password || !password2  ) {
+        errors.push('Please enter all fields');
+    }
+
+    if(password !== password2) {
+        errors.push('Password does not match');
+    }
+
+    if(errors.length > 0) {
+        res.render('register.ejs', { errors });
+    }
+
+    connection.query('SELECT * FROM '' WHERE username = ?', [username], (err, result) => {
+        if(err) throw err;
+
+        if(result.length > 0) {
+            res.render('register.ejs', { errors: ['Username already exists'] });
+        } else {
+            const newUser = [
+                [~~(Math.random() * 10000), name, username, email, bcrypt.hashSync(password, bcrypt.genSaltSync(10))]
+            ];
+            
+            connection.query('INSERT INTO '' (userKey, name, username, email, password ) VALUES ?', [newUser], (err, result) => {
+                if(err) throw err;
+            });
+
+            res.render('register.ejs', { errors: ['Register success'] });
+        }
+    });
+});
+
+router.post('/login', (req, res, next) => {
+    passport.authenticate('local', {
+        successRedirect: '/profile',
+        failureRedirect: '/login',
+        failureFlash: true
+    })(req, res, next);
+});
+
+router.get('/logout', (req, res) => {
+    req.logOut();
+    res.redirect('/login');
+});
